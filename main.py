@@ -1,3 +1,4 @@
+import sys
 from input import parse_yaml
 from clusters import load_clusters_from_config
 from tests.execution import run_tests
@@ -6,8 +7,8 @@ from tests.martrix import generate_test_matrix, generate_test_suite
 from output import print_results
 
 
-if __name__ == "__main__":
-    config_data = parse_yaml("test.yaml")
+def main(config_file: str) -> None:
+    config_data = parse_yaml(config_file)
 
     clusters = load_clusters_from_config(config_data.get("clusters", []))
     sources, destinations = generate_test_matrix(clusters)
@@ -17,3 +18,14 @@ if __name__ == "__main__":
         with TestManager(test_name, test_resources):
             results = run_tests(sources, destinations, clusters)
             print_results(results, sources, destinations, clusters, verbose=True)
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) != 2:
+        print("Usage: python main.py <config_file>")
+        exit(1)
+
+    config_file = sys.argv[1]
+    main(config_file)
