@@ -88,7 +88,7 @@ class Cluster:
         self.remapped_cidrs = get_remapped_cidrs(self.kubeconfig_location)
 
 
-def load_clusters_from_config(config_data: list) -> list[Cluster]:
+def load_clusters_from_config(config_data: list) -> dict[str, Cluster]:
     """
     Loads cluster configurations from the provided data and initializes Cluster instances.
 
@@ -96,9 +96,9 @@ def load_clusters_from_config(config_data: list) -> list[Cluster]:
         config_data (dict): Configuration data containing cluster information.
 
     Returns:
-        list[Cluster]: List of initialized Cluster instances.
+        dict[str, Cluster]: Dictionary of initialized Cluster instances keyed by cluster name.
     """
-    clusters = []
+    clusters = {}
 
     for cluster_cfg in config_data:
         cluster = Cluster(
@@ -107,6 +107,6 @@ def load_clusters_from_config(config_data: list) -> list[Cluster]:
             namespaces=[ns_cfg["name"] for ns_cfg in cluster_cfg.get("namespaces", [])],
             color=cluster_cfg.get("color"),
         )
-        clusters.append(cluster)
+        clusters[cluster.name] = cluster
 
     return clusters

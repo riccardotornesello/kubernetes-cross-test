@@ -16,4 +16,4 @@ if __name__ == "__main__":
     for test_name, test_resources in tests_suites:
         with TestManager(test_name, test_resources):
             results = run_tests(sources, destinations, clusters)
-            print_results(results, sources, destinations, verbose=True)
+            print_results(results, sources, destinations, clusters, verbose=True)

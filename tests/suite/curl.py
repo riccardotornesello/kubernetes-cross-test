@@ -6,7 +6,7 @@ def test_curl(
     namespace: str,
     pod: str,
     target_ip: str,
-    dst_hostname: str,
+    target_hostname: str,
 ) -> bool:
     """
     Tests HTTP connectivity from a source pod to a target IP using curl.
@@ -20,7 +20,7 @@ def test_curl(
         namespace (str): The namespace of the source pod.
         pod (str): The name of the source pod.
         target_ip (str): The target IP address to test connectivity to.
-        dst_hostname (str): The expected hostname in the HTTP response.
+        target_hostname (str): The expected hostname in the HTTP response.
 
     Returns:
         bool: True if the curl request succeeds with HTTP 200 and contains
@@ -55,14 +55,14 @@ def test_curl(
         if len(lines) < 2:
             return False
 
+        # Check the status code
         status_code = lines[-1]
-        received_hostname_str = _find_hostname_line(lines)
-
-        # Check both status code and hostname in response body
         if status_code != "200":
             return False
 
-        expected_hostname_str = f"Hostname: {dst_hostname}"
+        # Check the hostname in response body
+        received_hostname_str = _find_hostname_line(lines)
+        expected_hostname_str = f"Hostname: {target_hostname}"
         if received_hostname_str != expected_hostname_str:
             print(
                 f"Expected hostname '{expected_hostname_str}' but got '{received_hostname_str}'"

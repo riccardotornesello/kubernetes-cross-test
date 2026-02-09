@@ -3,14 +3,20 @@ clusters:
     color: "43"
     kubeconfig_location: /home/riccardo/kubernetes-testbench/out/kubeconfigs/rome.yaml
     namespaces:
-      - name: "nc"
+      - name: "nlr"
       - name: "no"
   - name: milan
     color: "44"
     kubeconfig_location: /home/riccardo/kubernetes-testbench/out/kubeconfigs/milan.yaml
     namespaces:
+      - name: "nlm"
       - name: "no-rome"
-      - name: "np"
+  - name: venice
+    color: "45"
+    kubeconfig_location: /home/riccardo/kubernetes-testbench/out/kubeconfigs/venice.yaml
+    namespaces:
+      - name: "nlv"
+      - name: "no-rome"
 
 tests:
   - name: Default

@@ -4,44 +4,43 @@ from resources.test import test_resources
 
 
 def generate_test_matrix(
-    clusters: list[Cluster],
+    clusters: dict[str, Cluster],
 ) -> tuple[list[TestEntity], list[TestEntity]]:
     pods = [
         TestEntity(
+            type="pod",
+            test_suite=["ping", "curl"],
+            ip=p.ip,
             name=p.name,
             namespace=ns,
             cluster_name=c.name,
-            type="pod",
-            ip=p.ip,
-            test_suite=["ping", "curl"],
-            color=c.color,
         )
-        for c in clusters
+        for c in clusters.values()
         for ns in c.namespaces
         for p in c.pods[ns]
     ]
 
     services = [
         TestEntity(
+            type="service",
+            test_suite=["curl"],
             name=s.name,
             namespace=ns,
             cluster_name=c.name,
-            type="service",
             ip=s.cluster_ip,
-            test_suite=["curl"],
-            color=c.color,
         )
-        for c in clusters
+        for c in clusters.values()
         for ns in c.namespaces
         for s in c.services[ns]
     ]
 
     internet = TestEntity(
+        type="external",
+        test_suite=["ping"],
         name="internet",
         namespace="",
-        type="external",
         ip="8.8.8.8",
-        test_suite=["ping"],
+        cluster_name=None,
     )
 
     sources = pods
@@ -51,10 +50,10 @@ def generate_test_matrix(
 
 
 def generate_test_suite(
-    test_cases: list[dict], clusters: list[Cluster]
+    test_cases: list[dict], clusters: dict[str, Cluster]
 ) -> list[tuple[str, list[TestEntity]]]:
     test_suites = []
-    kubeconfigs = {c.name: c.kubeconfig_location for c in clusters}
+    kubeconfigs = {c.name: c.kubeconfig_location for c in clusters.values()}
 
     for test_case in test_cases:
         test_name = test_case.get("name", "Unnamed Test Suite")

@@ -1,8 +1,9 @@
 from tabulate import tabulate
+from clusters import Cluster
 from tests.execution import Test, TestEntity
 
 
-def format_header_color(destination: TestEntity) -> str:
+def format_header_color(destination: TestEntity, clusters: dict[str, Cluster]) -> str:
     """
     Formats a destination entity name with ANSI color codes for terminal display.
     Colors are assigned based on the entity's color field.
@@ -14,7 +15,9 @@ def format_header_color(destination: TestEntity) -> str:
         str: The entity name wrapped with ANSI color codes.
     """
     name = destination.name
-    color = destination.color
+    color = (
+        clusters[destination.cluster_name].color if destination.cluster_name else None
+    )
 
     if not color:
         return f" {name} "
@@ -38,7 +41,8 @@ def get_result_cell(test_results: dict | None) -> str:
     if not test_results:
         return ""
 
-    results_list = [test_results.get("curl"), test_results.get("ping")]
+    # TODO: dynamic ordering
+    results_list = [test_results.get("ping"), test_results.get("curl")]
     return "".join([get_single_result_cell(result) for result in results_list])
 
 
@@ -68,6 +72,7 @@ def get_formatted_results(
     results: dict,
     sources: list[TestEntity],
     destinations: list[TestEntity],
+    clusters: dict[str, Cluster],
 ) -> list[list[str]]:
     """
     Formats test results into a 2D list for tabular display.
@@ -86,11 +91,14 @@ def get_formatted_results(
             followed by formatted result cells for each destination.
     """
     return [
-        [format_header_color(source)]
+        [format_header_color(source, clusters)]
         + [
             get_result_cell(
-                results.get(source.name, {})
+                results.get(source.cluster_name, {})
+                .get(source.namespace, {})
+                .get(source.name, {})
                 .get(destination.cluster_name, {})
+                .get(destination.namespace, {})
                 .get(destination.name)
             )
             for destination in destinations
@@ -113,7 +121,7 @@ def print_test_summary(tests: list[Test]) -> None:
         result_str = f"{color}{result_str}\x1b[0m"
 
         print(
-            f"{test.src_name} ({test.src_ip}) -> {test.dst_name} ({test.dst_ip}) | {test.test_type}: {result_str}"
+            f"{test.src.name} ({test.src.ip}) -> {test.dst.name} ({test.dst.ip}) | {test.test_type}: {result_str}"
         )
 
 
@@ -121,6 +129,7 @@ def print_results(
     tests: list[Test],
     sources: list[TestEntity],
     destinations: list[TestEntity],
+    clusters: dict[str, Cluster],
     verbose: bool = False,
 ) -> None:
     """
@@ -140,29 +149,55 @@ def print_results(
         None: Results are printed to stdout.
     """
     # For easier access, convert the results list into a nested dict.
-    # Source name -> Destination cluster -> Destination name -> Test type -> Result
+    # Source cluster -> Source namespace -> Source name -> Destination cluster -> Destination namespace -> Destination name -> Test type -> Result
 
     results_dict: dict = {}
     for test in tests:
-        src_name = test.src_name
-        dst_name = test.dst_name
-        dst_cluster_name = test.dst_cluster_name
-        test_type = test.test_type
+        src_cluster = test.src.cluster_name
+        if src_cluster not in results_dict:
+            results_dict[src_cluster] = {}
 
-        if src_name not in results_dict:
-            results_dict[src_name] = {}
+        src_namespace = test.src.namespace
+        if src_namespace not in results_dict[src_cluster]:
+            results_dict[src_cluster][src_namespace] = {}
 
-        if dst_cluster_name not in results_dict[src_name]:
-            results_dict[src_name][dst_cluster_name] = {}
+        src_name = test.src.name
+        if src_name not in results_dict[src_cluster][src_namespace]:
+            results_dict[src_cluster][src_namespace][src_name] = {}
 
-        if dst_name not in results_dict[src_name][dst_cluster_name]:
-            results_dict[src_name][dst_cluster_name][dst_name] = {}
+        dst_cluster = test.dst.cluster_name
+        if dst_cluster not in results_dict[src_cluster][src_namespace][src_name]:
+            results_dict[src_cluster][src_namespace][src_name][dst_cluster] = {}
 
-        results_dict[src_name][dst_cluster_name][dst_name][test_type] = test.result
+        dst_namespace = test.dst.namespace
+        if (
+            dst_namespace
+            not in results_dict[src_cluster][src_namespace][src_name][dst_cluster]
+        ):
+            results_dict[src_cluster][src_namespace][src_name][dst_cluster][
+                dst_namespace
+            ] = {}
+
+        dst_name = test.dst.name
+        if (
+            dst_name
+            not in results_dict[src_cluster][src_namespace][src_name][dst_cluster][
+                dst_namespace
+            ]
+        ):
+            results_dict[src_cluster][src_namespace][src_name][dst_cluster][
+                dst_namespace
+            ][dst_name] = {}
+
+        results_dict[src_cluster][src_namespace][src_name][dst_cluster][dst_namespace][
+            dst_name
+        ][test.test_type] = test.result
 
     if verbose:
         print_test_summary(tests)
 
-    header = ["source pod"] + [format_header_color(dest) for dest in destinations]
-    rows = get_formatted_results(results_dict, sources, destinations)
+    header = ["source pod"] + [
+        format_header_color(dest, clusters) for dest in destinations
+    ]
+    rows = get_formatted_results(results_dict, sources, destinations, clusters)
     print(tabulate(rows, headers=header))

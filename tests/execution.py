@@ -1,82 +1,17 @@
-from dataclasses import dataclass
-from typing import Literal
 import concurrent.futures
+import dataclasses
 
 from tqdm import tqdm
 
-from .suite import test_suite
 from utils.network import remap_ip
 from clusters import Cluster
-
-
-@dataclass
-class Test:
-    test_type: Literal["ping", "curl"]
-    src_ip: str
-    dst_ip: str
-    src_name: str
-    src_namespace: str
-    dst_name: str
-    dst_cluster_name: str
-    dst_hostname: str
-    kubeconfig_location: str
-    result: bool | None = None
-
-    def run(self) -> None:
-        """
-        Executes the test and stores the result.
-
-        Runs the appropriate test function (ping or curl) based on test_type
-        and updates the result attribute with the outcome.
-
-        Raises:
-            ValueError: If test_type is not "ping" or "curl".
-        """
-        test_params = {
-            "kubeconfig_location": self.kubeconfig_location,
-            "namespace": self.src_namespace,
-            "pod": self.src_name,
-            "target_ip": self.dst_ip,
-            "dst_hostname": self.dst_hostname,
-        }
-
-        test_function = test_suite.get(self.test_type)
-        if test_function is None:
-            raise ValueError(f"Unknown test type: {self.test_type}")
-
-        self.result = test_function(**test_params)
-
-
-@dataclass
-class TestEntity:
-    """
-    Represents an entity involved in network testing.
-    It can be a pod, service, or external endpoint.
-    It can be a source or destination in tests.
-
-    Attributes:
-        name (str): The name of the entity.
-        namespace (str): The namespace of the entity.
-        type (Literal["pod", "service", "external"]): The type of the entity.
-        ip (str): The IP address of the entity.
-        test_suite (list[Literal["ping", "curl"]]): List of tests to run against this entity.
-        color (str | None): Optional color code for display purposes.
-        cluster_name (str | None): The name of the cluster the entity belongs to.
-    """
-
-    name: str
-    namespace: str
-    type: Literal["pod", "service", "external"]
-    ip: str
-    test_suite: list[Literal["ping", "curl"]]
-    color: str | None = None
-    cluster_name: str | None = None
+from tests.types import Test, TestEntity
 
 
 def run_tests(
     sources: list[TestEntity],
     destinations: list[TestEntity],
-    clusters: list[Cluster],
+    clusters: dict[str, Cluster],
     max_workers: int = 10,
 ) -> list[Test]:
     """
@@ -98,7 +33,7 @@ def run_tests(
     Args:
         sources (list[TestEntity]): List of source entities to test from.
         destinations (list[TestEntity]): List of destination entities to test to.
-        clusters (list[Cluster]): List of clusters for IP remapping.
+        clusters (dict[str, Cluster]): List of clusters for IP remapping.
         max_workers (int, optional): Maximum number of concurrent test threads. Defaults to 5.
 
     Returns:
@@ -106,13 +41,13 @@ def run_tests(
     """
     tests: list[Test] = []
 
-    remapped_cidrs = {c.name: c.remapped_cidrs for c in clusters}
-    kubeconfigs = {c.name: c.kubeconfig_location for c in clusters}
+    remapped_cidrs = {c.name: c.remapped_cidrs for c in clusters.values()}
+    kubeconfigs = {c.name: c.kubeconfig_location for c in clusters.values()}
 
     for source in sources:
         for destination in destinations:
             # Skip testing to self
-            if source.name == destination.name:
+            if is_same_peer(source, destination):
                 continue
 
             # Skip testing service from pod in different cluster
@@ -128,6 +63,10 @@ def run_tests(
                 destination.cluster_name
                 and source.cluster_name != destination.cluster_name
             ):
+                # Skip if the destination is in a cluster that cannot be reached from the source cluster
+                if destination.cluster_name not in remapped_cidrs[source.cluster_name]:
+                    continue
+
                 target_ip = remap_ip(
                     target_ip,
                     remapped_cidrs[source.cluster_name][destination.cluster_name],
@@ -138,16 +77,8 @@ def run_tests(
                 tests.append(
                     Test(
                         test_type=test_type,
-                        src_ip=source.ip,
-                        dst_ip=target_ip,
-                        src_name=source.name,
-                        src_namespace=source.namespace,
-                        dst_name=destination.name,
-                        dst_cluster_name=destination.cluster_name,
-                        dst_hostname="p"
-                        + destination.name[
-                            1:
-                        ],  # In case of a service, replace the 's' with 'p' to get the pod hostname
+                        src=source,
+                        dst=dataclasses.replace(destination, ip=target_ip),
                         kubeconfig_location=kubeconfigs[source.cluster_name],
                     )
                 )
@@ -166,3 +97,24 @@ def run_tests(
                 print(f"Generated an exception: {exc}")
 
     return tests
+
+
+def is_same_peer(src: TestEntity, dst: TestEntity) -> bool:
+    """
+    Determines if the source and destination entities are the same peer.
+
+    Compares the name, namespace, and cluster name of the source and destination
+    entities to determine if they refer to the same peer.
+
+    Args:
+        src (TestEntity): The source entity.
+        dst (TestEntity): The destination entity.
+
+    Returns:
+        bool: True if src and dst refer to the same peer, False otherwise.
+    """
+    return (
+        src.name == dst.name
+        and src.namespace == dst.namespace
+        and src.cluster_name == dst.cluster_name
+    )
