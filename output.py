@@ -125,29 +125,7 @@ def print_test_summary(tests: list[Test]) -> None:
         )
 
 
-def print_results(
-    tests: list[Test],
-    sources: list[TestEntity],
-    destinations: list[TestEntity],
-    clusters: dict[str, Cluster],
-    verbose: bool = False,
-) -> None:
-    """
-    Prints test results in a formatted table to the console.
-
-    Converts a list of test objects into a nested dictionary structure, then
-    formats and prints the results as a colored table with sources as rows
-    and destinations as columns.
-
-    Args:
-        tests (list[Test]): List of test objects containing test results.
-        sources (list[TestEntity]): List of source entities (rows in the table).
-        destinations (list[TestEntity]): List of destination entities (columns in the table).
-        verbose (bool, optional): If True, prints a detailed summary of each test. Defaults to False.
-
-    Returns:
-        None: Results are printed to stdout.
-    """
+def create_results_map(tests: list[Test]) -> dict:
     # For easier access, convert the results list into a nested dict.
     # Source cluster -> Source namespace -> Source name -> Destination cluster -> Destination namespace -> Destination name -> Test type -> Result
 
@@ -193,11 +171,34 @@ def print_results(
             dst_name
         ][test.test_type] = test.result
 
-    if verbose:
-        print_test_summary(tests)
+    return results_dict
+
+
+def print_results(
+    results_map: dict,
+    sources: list[TestEntity],
+    destinations: list[TestEntity],
+    clusters: dict[str, Cluster],
+) -> None:
+    """
+    Prints test results in a formatted table to the console.
+
+    Converts a list of test objects into a nested dictionary structure, then
+    formats and prints the results as a colored table with sources as rows
+    and destinations as columns.
+
+    Args:
+        results_map (dict): Nested dictionary containing test results.
+        sources (list[TestEntity]): List of source entities (rows in the table).
+        destinations (list[TestEntity]): List of destination entities (columns in the table).
+        clusters (dict[str, Cluster]): Dictionary of cluster information for formatting.
+
+    Returns:
+        None: Results are printed to stdout.
+    """
 
     header = ["source pod"] + [
         format_header_color(dest, clusters) for dest in destinations
     ]
-    rows = get_formatted_results(results_dict, sources, destinations, clusters)
+    rows = get_formatted_results(results_map, sources, destinations, clusters)
     print(tabulate(rows, headers=header))
