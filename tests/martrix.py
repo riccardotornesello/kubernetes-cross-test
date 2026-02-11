@@ -43,8 +43,17 @@ def generate_test_matrix(
         cluster_name=None,
     )
 
+    nameserver = TestEntity(
+        type="external",
+        test_suite=["nslookup"],
+        name="nameserver",
+        namespace="",
+        ip="google.com",
+        cluster_name=None,
+    )
+
     sources = pods
-    destinations = pods + services + [internet]
+    destinations = pods + services + [internet, nameserver]
 
     return sources, destinations
 

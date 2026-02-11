@@ -44,8 +44,8 @@ def test_nslookup(
         stdin=False,
         stdout=True,
         tty=False,
+        _preload_content=False,
     )
+    resp.run_forever(timeout=60)
 
-    exit_code = resp.returncode if hasattr(resp, "returncode") else 0
-
-    return exit_code == 0
+    return resp.returncode == 0

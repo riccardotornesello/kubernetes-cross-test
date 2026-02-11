@@ -42,7 +42,7 @@ def get_result_cell(test_results: dict | None) -> str:
         return ""
 
     # TODO: dynamic ordering
-    results_list = [test_results.get("ping"), test_results.get("curl")]
+    results_list = [test_results.get("ping"), test_results.get("curl"), test_results.get("nslookup")]
     return "".join([get_single_result_cell(result) for result in results_list])
 
 
