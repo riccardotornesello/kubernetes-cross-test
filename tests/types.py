@@ -3,7 +3,7 @@ from typing import Literal
 from .suite import test_suite
 
 
-TestType = Literal["ping", "curl"]
+TestType = Literal["ping", "curl", "nslookup"]
 
 
 @dataclass
@@ -11,6 +11,7 @@ class TestEntity:
     type: Literal["pod", "service", "external"]
     test_suite: list[TestType]
     ip: str
+    hostname: str
     name: str
     namespace: str
     cluster_name: str | None
@@ -28,23 +29,18 @@ class Test:
         """
         Executes the test and stores the result.
 
-        Runs the appropriate test function (ping or curl) based on test_type
+        Runs the appropriate test function (ping, curl, or nslookup) based on test_type
         and updates the result attribute with the outcome.
 
         Raises:
-            ValueError: If test_type is not "ping" or "curl".
+            ValueError: If test_type is not "ping", "curl", or "nslookup".
         """
-        # TODO: make dynamic
-        target_hostname = self.dst.name
-        if target_hostname[0] == "s":
-            target_hostname = "p" + target_hostname[1:]
-
         test_params = {
             "kubeconfig_location": self.kubeconfig_location,
             "namespace": self.src.namespace,
             "pod": self.src.name,
             "target_ip": self.dst.ip,
-            "target_hostname": target_hostname,
+            "target_hostname": self.dst.hostname,
         }
 
         test_function = test_suite.get(self.test_type)

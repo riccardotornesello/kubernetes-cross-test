@@ -10,10 +10,11 @@ def generate_test_matrix(
         TestEntity(
             type="pod",
             test_suite=["ping", "curl"],
-            ip=p.ip,
             name=p.name,
             namespace=ns,
             cluster_name=c.name,
+            ip=p.ip,
+            hostname=p.name,
         )
         for c in clusters.values()
         for ns in c.namespaces
@@ -28,6 +29,7 @@ def generate_test_matrix(
             namespace=ns,
             cluster_name=c.name,
             ip=s.cluster_ip,
+            hostname="p" + s.name[1:] if s.name[0] == "s" else s.name, # TODO: make generic
         )
         for c in clusters.values()
         for ns in c.namespaces
@@ -39,8 +41,9 @@ def generate_test_matrix(
         test_suite=["ping"],
         name="internet",
         namespace="",
-        ip="8.8.8.8",
         cluster_name=None,
+        ip="8.8.8.8",
+        hostname=None,
     )
 
     nameserver = TestEntity(
@@ -48,8 +51,9 @@ def generate_test_matrix(
         test_suite=["nslookup"],
         name="nameserver",
         namespace="",
-        ip="google.com",
         cluster_name=None,
+        ip=None,
+        hostname="google.com",
     )
 
     sources = pods
