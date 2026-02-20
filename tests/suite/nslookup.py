@@ -32,7 +32,7 @@ def test_nslookup(
     exec_command = [
         "/bin/sh",
         "-c",
-        f"nslookup {target_hostname}",
+        f"nslookup {target_hostname} -timeout=1",
     ]
 
     resp = stream.stream(
