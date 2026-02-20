@@ -1,5 +1,6 @@
 import argparse
 import json
+from dataclasses import asdict
 from input import parse_yaml
 from clusters import load_clusters_from_config
 from tests.execution import run_tests
@@ -29,7 +30,24 @@ def main(
 
             if output_path:
                 with open(output_path, "w") as f:
-                    json.dump(results_map, f, indent=2)
+                    json.dump(
+                        {
+                            "results_map": results_map,
+                            "sources": [asdict(x) for x in sources],
+                            "destinations": [asdict(x) for x in destinations],
+                            "clusters": {
+                                x: {
+                                    "name": cluster.name,
+                                    "kubeconfig_location": cluster.kubeconfig_location,
+                                    "namespaces": cluster.namespaces,
+                                    "color": cluster.color,
+                                }
+                                for x, cluster in clusters.items()
+                            },
+                        },
+                        f,
+                        indent=2,
+                    )
 
             print_results(results_map, sources, destinations, clusters)
 

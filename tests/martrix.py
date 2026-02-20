@@ -29,7 +29,7 @@ def generate_test_matrix(
             namespace=ns,
             cluster_name=c.name,
             ip=s.cluster_ip,
-            hostname="p" + s.name[1:] if s.name[0] == "s" else s.name, # TODO: make generic
+            hostname=s.name[1:], # TODO: make generic
         )
         for c in clusters.values()
         for ns in c.namespaces
@@ -41,7 +41,7 @@ def generate_test_matrix(
         test_suite=["ping"],
         name="internet",
         namespace="",
-        cluster_name=None,
+        cluster_name="",
         ip="8.8.8.8",
         hostname=None,
     )
@@ -51,7 +51,7 @@ def generate_test_matrix(
         test_suite=["nslookup"],
         name="nameserver",
         namespace="",
-        cluster_name=None,
+        cluster_name="",
         ip=None,
         hostname="google.com",
     )
