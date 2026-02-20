@@ -40,6 +40,7 @@ class Cluster:
         kubeconfig_location: str,
         namespaces: list[str],
         color: str = "44",
+        fetch_initial_data: bool = True,
     ):
         """
         Initializes a Cluster instance and retrieves initial pod and service information.
@@ -49,11 +50,12 @@ class Cluster:
             kubeconfig_location (str): Path to the kubeconfig file.
             namespaces (list[str]): List of namespaces to monitor.
             color (str, optional): Color code for display purposes. Defaults to "44".
+            fetch_initial_data (bool, optional): Whether to fetch initial data on initialization. Defaults to True.
 
         Raises:
             FileNotFoundError: If the kubeconfig file does not exist.
         """
-        if not os.path.exists(kubeconfig_location):
+        if fetch_initial_data and not os.path.exists(kubeconfig_location):
             raise FileNotFoundError(
                 f"Kubeconfig file '{kubeconfig_location}' not found."
             )
@@ -64,28 +66,38 @@ class Cluster:
 
         self.namespaces = namespaces
 
-        self.nodes = get_nodes(self.kubeconfig_location)
+        if fetch_initial_data:
+            self.nodes = get_nodes(self.kubeconfig_location)
 
-        virtual_nodes = [
-            node.name
-            for node in self.nodes
-            if node.labels.get("liqo.io/type") == "virtual-node"
-        ]
-        self.pods = {
-            ns: get_pods(
-                self.kubeconfig_location, namespace=ns, excluded_nodes=virtual_nodes
+            virtual_nodes = [
+                node.name
+                for node in self.nodes
+                if node.labels.get("liqo.io/type") == "virtual-node"
+            ]
+            self.pods = {
+                ns: get_pods(
+                    self.kubeconfig_location, namespace=ns, excluded_nodes=virtual_nodes
+                )
+                for ns in self.namespaces
+            }
+
+            self.services = {
+                ns: get_services(self.kubeconfig_location, namespace=ns)
+                for ns in self.namespaces
+            }
+
+            self.local_offloaded_pods = get_local_offloaded_pods(
+                self.kubeconfig_location
             )
-            for ns in self.namespaces
-        }
 
-        self.services = {
-            ns: get_services(self.kubeconfig_location, namespace=ns)
-            for ns in self.namespaces
-        }
+            self.remapped_cidrs = get_remapped_cidrs(self.kubeconfig_location)
 
-        self.local_offloaded_pods = get_local_offloaded_pods(self.kubeconfig_location)
-
-        self.remapped_cidrs = get_remapped_cidrs(self.kubeconfig_location)
+        else:
+            self.nodes = []
+            self.pods = {ns: [] for ns in self.namespaces}
+            self.services = {ns: [] for ns in self.namespaces}
+            self.local_offloaded_pods = {}
+            self.remapped_cidrs = {}
 
 
 def load_clusters_from_config(config_data: list) -> dict[str, Cluster]:
