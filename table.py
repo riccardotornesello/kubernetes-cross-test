@@ -18,8 +18,7 @@ if __name__ == "__main__":
     sources = [TestEntity(**x) for x in output_content["sources"]]
     destinations = [TestEntity(**x) for x in output_content["destinations"]]
     clusters = {
-        k: Cluster(**v, fetch_initial_data=False)
-        for k, v in output_content["clusters"].items()
+        k: Cluster.from_dict(v) for k, v in output_content["clusters"].items()
     }
 
     print_results(results_map, sources, destinations, clusters)

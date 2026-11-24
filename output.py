@@ -14,16 +14,9 @@ def format_header_color(destination: TestEntity, clusters: dict[str, Cluster]) -
     Returns:
         str: The entity name wrapped with ANSI color codes.
     """
-    name = destination.name
-    color = (
-        clusters[destination.cluster_name].color if destination.cluster_name else None
-    )
-
-    if not color:
-        return f" {name} "
-
-    else:
-        return f"\x1b[{color}m {name} \x1b[0m"
+    if not destination.cluster_name:
+        return f" {destination.name} "
+    return clusters[destination.cluster_name].colorize(destination.name)
 
 
 def get_result_cell(test_results: dict | None) -> str:

@@ -1,8 +1,8 @@
 import argparse
 import json
 from dataclasses import asdict
-from input import parse_yaml
-from clusters import load_clusters_from_config
+from input import load_config_or_exit
+from clusters import load_clusters
 from tests.execution import run_tests
 from tests.context import TestManager
 from tests.martrix import generate_test_matrix, generate_test_suite
@@ -14,11 +14,11 @@ def main(
     verbose: bool = False,
     output_path: str | None = None,
 ) -> None:
-    config_data = parse_yaml(config_file)
+    config = load_config_or_exit(config_file)
 
-    clusters = load_clusters_from_config(config_data.get("clusters", []))
+    clusters = load_clusters(config)
     sources, destinations = generate_test_matrix(clusters)
-    tests_suites = generate_test_suite(config_data.get("tests", []), clusters)
+    tests_suites = generate_test_suite(config.tests, clusters)
 
     for test_name, test_resources in tests_suites:
         with TestManager(test_name, test_resources):
@@ -36,13 +36,8 @@ def main(
                             "sources": [asdict(x) for x in sources],
                             "destinations": [asdict(x) for x in destinations],
                             "clusters": {
-                                x: {
-                                    "name": cluster.name,
-                                    "kubeconfig_location": cluster.kubeconfig_location,
-                                    "namespaces": cluster.namespaces,
-                                    "color": cluster.color,
-                                }
-                                for x, cluster in clusters.items()
+                                name: cluster.to_dict()
+                                for name, cluster in clusters.items()
                             },
                         },
                         f,

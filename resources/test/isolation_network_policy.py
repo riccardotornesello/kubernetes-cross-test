@@ -1,74 +1,66 @@
+from pydantic import Field
+
 from resources.kubernetes import NetworkPolicyResource
-from clusters import Cluster
+from resources.test.base import TestResource, TestResourceOptions
+from validation import Dns1123Label, IPv4Cidr
 
 
-class IsolationNetworkPolicyResource(NetworkPolicyResource):
+class IsolationNetworkPolicyOptions(TestResourceOptions):
     """
     Options:
         allowed_cidrs (list[str]): List of allowed CIDR blocks.
         allowed_namespaces (list[str]): List of allowed namespaces.
-        allowed_clusters (list[str]): List of allowed clusters.
+        allowed_clusters (list[str]): List of allowed (remote) clusters.
     """
 
+    allowed_cidrs: list[IPv4Cidr] = Field(default_factory=list)
+    allowed_namespaces: list[Dns1123Label] = Field(default_factory=list)
+    allowed_clusters: list[Dns1123Label] = Field(default_factory=list)
+
+    def referenced_clusters(self) -> list[str]:
+        return list(self.allowed_clusters)
+
+
+class IsolationNetworkPolicyResource(TestResource, NetworkPolicyResource):
+    """
+    NetworkPolicy isolating the pods of a namespace: only traffic within the
+    namespace, with the allowed namespaces, CIDRs and clusters, and towards
+    public addresses is allowed.
+    """
+
+    Options = IsolationNetworkPolicyOptions
+    options: IsolationNetworkPolicyOptions
+
     def _get_body_content(self) -> dict:
-        # Settings
-        clusters: list[Cluster] = self.options["clusters"]
-        cluster: str = self.options["cluster"]
-
-        allowed_cidrs = self.options.get("allowed_cidrs", [])
-        allowed_namespaces = self.options.get("allowed_namespaces", [])
-        allowed_clusters = self.options.get("allowed_clusters", [])
-
-        current_cluster = None
-        for c in clusters:
-            if c.name == cluster:
-                current_cluster = c
-                break
-        if not current_cluster:
-            raise ValueError(f"Cluster '{cluster}' not found in clusters list.")
+        # Remapped pod CIDRs of the allowed clusters, as seen from this cluster
+        allowed_cluster_cidrs = [
+            self.cluster.remapped_cidr(c) for c in self.options.allowed_clusters
+        ]
 
         # Rules
         allowed_cidr_egress_rules = [
-            {
-                "to": [
-                    {
-                        "ipBlock": {
-                            "cidr": cidr,
-                        }
-                    }
-                ]
-            }
-            for cidr in allowed_cidrs
+            {"to": [{"ipBlock": {"cidr": cidr}}]}
+            for cidr in self.options.allowed_cidrs
         ]
         allowed_cidr_ingress_rules = [
-            {
-                "from": [
-                    {
-                        "ipBlock": {
-                            "cidr": cidr,
-                        }
-                    }
-                ]
-            }
-            for cidr in allowed_cidrs
+            {"from": [{"ipBlock": {"cidr": cidr}}]}
+            for cidr in self.options.allowed_cidrs
         ]
 
         allowed_namespaces_egress_rules = [
             {"to": [{"namespaceSelector": {"matchLabels": {"name": ns}}}]}
-            for ns in allowed_namespaces
+            for ns in self.options.allowed_namespaces
         ]
         allowed_namespaces_ingress_rules = [
             {"from": [{"namespaceSelector": {"matchLabels": {"name": ns}}}]}
-            for ns in allowed_namespaces
+            for ns in self.options.allowed_namespaces
         ]
 
         allowed_clusters_egress_rules = [
-            {"to": [{"ipBlock": {"cidr": current_cluster.remapped_cidrs[c]}}]}
-            for c in allowed_clusters
+            {"to": [{"ipBlock": {"cidr": cidr}}]} for cidr in allowed_cluster_cidrs
         ]
         allowed_clusters_ingress_rules = [
-            {"from": [{"ipBlock": {"cidr": current_cluster.remapped_cidrs[c]}}]}
-            for c in allowed_clusters
+            {"from": [{"ipBlock": {"cidr": cidr}}]} for cidr in allowed_cluster_cidrs
         ]
 
         # Body

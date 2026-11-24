@@ -10,6 +10,8 @@ class NetworkPolicyResource(BaseResource):
     Provides methods to create and delete NetworkPolicy resources.
     """
 
+    KIND = "NetworkPolicy"
+
     def create(self):
         """
         Creates the NetworkPolicy in the Kubernetes cluster.

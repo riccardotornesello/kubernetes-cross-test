@@ -1,44 +1,53 @@
+from pydantic import Field
+
 from resources.liqo import FirewallConfigurationResource
-from clusters import Cluster
+from resources.test.base import TestResource, TestResourceOptions
+from validation import Dns1123Label, IPv4AddressOrCidr
 
 
-class TunnelFirewallRuleResource(FirewallConfigurationResource):
+class TunnelFirewallRuleOptions(TestResourceOptions):
     """
     Options:
-        allowed_destination_ips (list[str]): List of allowed destination IPs.
-        allowed_source_ips (list[str]): List of allowed source IPs.
-        allow_to_offloaded_pods_from (str): Allow traffic to offloaded pods from specific clusters.
+        allowed_destination_ips (list[str]): List of allowed destination IPs (or CIDRs).
+        allowed_source_ips (list[str]): List of allowed source IPs (or CIDRs).
+        allow_to_offloaded_pods_from (str): Allow traffic to the pods offloaded by this cluster.
         allow_established (bool): Whether to allow established connections. Defaults to True.
     """
+
+    allowed_destination_ips: list[IPv4AddressOrCidr] = Field(default_factory=list)
+    allowed_source_ips: list[IPv4AddressOrCidr] = Field(default_factory=list)
+    allow_to_offloaded_pods_from: Dns1123Label | None = None
+    allow_established: bool = True
+
+    def referenced_clusters(self) -> list[str]:
+        if self.allow_to_offloaded_pods_from is None:
+            return []
+        return [self.allow_to_offloaded_pods_from]
+
+
+class TunnelFirewallRuleResource(TestResource, FirewallConfigurationResource):
+    """
+    FirewallConfiguration of the gateway dropping the traffic coming from the
+    tunnel, but for the allowed destinations and sources.
+    """
+
+    Options = TunnelFirewallRuleOptions
+    options: TunnelFirewallRuleOptions
 
     def _get_body_content(self) -> dict:
         # Settings
         table_name = f"tunnel-firewall-table-{self.name}"
 
-        clusters: list[Cluster] = self.options["clusters"]
-        cluster: str = self.options["cluster"]
-
-        allowed_destination_ips: list[str] = self.options.get(
-            "allowed_destination_ips", []
-        )
-        allowed_source_ips: list[str] = self.options.get("allowed_source_ips", [])
-        allow_to_offloaded_pods_from: str | None = self.options.get(
-            "allow_to_offloaded_pods_from"
-        )
-        allow_established: bool = self.options.get("allow_established", True)
+        allowed_destination_ips = list(self.options.allowed_destination_ips)
+        allowed_source_ips = list(self.options.allowed_source_ips)
+        allow_established = self.options.allow_established
 
         # Add allowed IPs for offloaded pods
-        if allow_to_offloaded_pods_from:
-            for c in clusters:
-                if c.name != cluster:
-                    continue
-
-                offloaded_pods = c.local_offloaded_pods.get(
-                    allow_to_offloaded_pods_from, {}
-                )
-                for pod in offloaded_pods:
-                    if pod.ip not in allowed_destination_ips:
-                        allowed_destination_ips.append(pod.ip)
+        origin = self.options.allow_to_offloaded_pods_from
+        if origin:
+            for pod in self.cluster.offloaded_pods_from(origin):
+                if pod.ip and pod.ip not in allowed_destination_ips:
+                    allowed_destination_ips.append(pod.ip)
 
         # Rules
         accept_destination_rules = [

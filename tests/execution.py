@@ -3,7 +3,6 @@ import dataclasses
 
 from tqdm import tqdm
 
-from utils.network import remap_ip
 from clusters import Cluster
 from tests.types import Test, TestEntity
 
@@ -41,9 +40,6 @@ def run_tests(
     """
     tests: list[Test] = []
 
-    remapped_cidrs = {c.name: c.remapped_cidrs for c in clusters.values()}
-    kubeconfigs = {c.name: c.kubeconfig_location for c in clusters.values()}
-
     for source in sources:
         for destination in destinations:
             # Skip testing to self
@@ -58,19 +54,14 @@ def run_tests(
                 continue
 
             # Remap IP if necessary
+            source_cluster = clusters[source.cluster_name]
             target_ip = destination.ip
-            if (
-                destination.cluster_name
-                and source.cluster_name != destination.cluster_name
-            ):
+            if destination.cluster_name:
                 # Skip if the destination is in a cluster that cannot be reached from the source cluster
-                if destination.cluster_name not in remapped_cidrs[source.cluster_name]:
+                if not source_cluster.can_reach(destination.cluster_name):
                     continue
 
-                target_ip = remap_ip(
-                    target_ip,
-                    remapped_cidrs[source.cluster_name][destination.cluster_name],
-                )
+                target_ip = source_cluster.remap_ip(target_ip, destination.cluster_name)
 
             # Create the test list
             for test_type in destination.test_suite:
@@ -79,7 +70,7 @@ def run_tests(
                         test_type=test_type,
                         src=source,
                         dst=dataclasses.replace(destination, ip=target_ip),
-                        kubeconfig_location=kubeconfigs[source.cluster_name],
+                        kubeconfig_location=source_cluster.kubeconfig_location,
                     )
                 )
 

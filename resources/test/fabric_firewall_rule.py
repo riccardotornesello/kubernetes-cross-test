@@ -1,19 +1,13 @@
-from resources import FirewallConfigurationResource
+from resources.liqo import FirewallConfigurationResource
+from resources.test.base import TestResource
 
 
-class FabricFirewallRuleResource(FirewallConfigurationResource):
-    def __init__(
-        self,
-        kubeconfig_path: str,
-        namespace: str,
-        name: str,
-    ):
-        super().__init__(
-            kubeconfig_path=kubeconfig_path,
-            namespace=namespace,
-            name=name,
-        )
-        
+class FabricFirewallRuleResource(TestResource, FirewallConfigurationResource):
+    """
+    FirewallConfiguration of the fabric dropping the traffic towards the
+    Google public DNS servers. No options.
+    """
+
     def _get_body_content(self) -> dict:
         return {
             "apiVersion": "networking.liqo.io/v1beta1",

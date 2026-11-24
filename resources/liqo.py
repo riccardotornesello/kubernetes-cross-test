@@ -11,6 +11,7 @@ class FirewallConfigurationResource(CustomResource):
     CR_GROUP = "networking.liqo.io"
     CR_VERSION = "v1beta1"
     CR_PLURAL = "firewallconfigurations"
+    KIND = "FirewallConfiguration"
 
 
 class NetworkResource(CustomResource):
@@ -24,3 +25,4 @@ class NetworkResource(CustomResource):
     CR_GROUP = "ipam.liqo.io"
     CR_VERSION = "v1alpha1"
     CR_PLURAL = "networks"
+    KIND = "Network"

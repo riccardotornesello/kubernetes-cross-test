@@ -22,7 +22,10 @@ class BaseResource:
     name: str | None
     options: dict
 
-    BODY_LOCATION: str | None
+    BODY_LOCATION: str | None = None
+    # Kind of the resource: two resources of the same kind, cluster and
+    # namespace cannot share a name
+    KIND: str = ""
 
     def __init__(
         self,
